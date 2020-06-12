@@ -2,8 +2,15 @@
 import subprocess
 from threading import Thread
 from queue import Queue, Empty
-from time import sleep
+from time import sleep,time
 
+## SSHClient implements an ssh client. 
+# Usage: 
+# client = SSHClient() 
+# client.connect()
+# (output, errors) = client.cmd(command)
+# where output : stdout and errors : stderr
+# the last return code can be found with client.get_return_code() 
 class SSHClient():
 
 	def __init__(self, host="192.168.7.2", port="22", username="root", password=None):
@@ -64,6 +71,7 @@ class SSHClient():
 
 	# sr = send-receive. Sends a command, waits for response then prints the full response.
 	def sr(self, command,msg_queue,timeout):
+		tmt=time()+timeout
 		reply=[]
 		self.send(command)
 		#waits for reply and empties the queue
@@ -74,11 +82,13 @@ class SSHClient():
 			except Empty:
 				# Host should at least reply exit code... check host connectivity
 				if self.is_host_up():
+					if time() < tmt:
+						continue
 					raise TimeoutError("Unexpected condition: the host appears to be up but it didn't reply")
 				else:
 					raise TimeoutError("The host is down.")
 			reply.append(line)
-			if line.isdigit():
+			if line.isdigit() and msg_queue.empty():
 				self.last_return_code=line
 				break
 
@@ -100,9 +110,12 @@ class SSHClient():
 		error=self.check_stderr(self.q_stderr)
 		return reply,error
 
+	def get_return_code(self):
+		return self.last_return_code
+
 if __name__=="__main__":
 
-	print("SSH client demo. This does not support passwords yet.")
+	print("Running SSH client in interactive mode. This does not support passwords yet.\nEither use SSH key authentication or remove password from host")
 	HOST = "192.168.7.2"
 	USER = "root"
 	# setup
